@@ -79,77 +79,84 @@ This repository contains the `DataSharingClient` class, which allows you to inte
     PASSWORD=your_password
     ```
 
-### Using the DataSharingClient
+### Example Usage
 
-1. **Open the Jupyter Notebook** in the `notebooks` directory:
+#### Setting Up the Environment
 
-    ```bash
-    jupyter notebook notebooks/data.ipynb
-    ```
+1. **Run the first code block to set all imports and initialize the client:**
 
-2. **Run the first code block** to start the client:
+    ```python
+    # Import necessary libraries and set up the environment
+    import os
+    import sys
+    from dotenv import load_dotenv
 
+    # Load environment variables from the .env file
+    load_dotenv()
+
+    # Add the project root to sys.path
+    notebook_dir = os.path.dirname(os.path.abspath('data.ipynb'))
+    project_root = os.path.abspath(os.path.join(notebook_dir, '..'))
+    if project_root not in sys.path:
+        sys.path.append(project_root)
+
+    from datasharing.datasharing import DataSharingClient
 
     # Initialize the client using credentials from .env file
     client = DataSharingClient()
+
+    # OR
+
+    # Initialize the client with direct input credentials
+    # username = "your_username"
+    # password = "your_password"
+    # client = DataSharingClient(username=username, password=password)
     ```
 
-## Example Usage
+2. **For VSCode users:** You can work directly in the `.ipynb` file without running the command line by selecting your virtual environment after clicking **Select Kernel** in the top right corner.
 
-```python
-# Import necessary libraries and set up the environment
-import os
-import sys
-from dotenv import load_dotenv
+#### 1. Creating a View
 
-# Load environment variables from the .env file
-load_dotenv()
+    ```python
+    # Example: Creating a view from a Parquet file in S3
+    s3_uri = "s3://your-bucket-name/path/to/yourfile.parquet"
+    view_name = "your_view_name"
+    client.create_view(s3_uri, view_name)
+    ```
 
-# Add the project root to sys.path
-notebook_dir = os.path.dirname(os.path.abspath('data.ipynb'))
-project_root = os.path.abspath(os.path.join(notebook_dir, '..'))
-if project_root not in sys.path:
-    sys.path.append(project_root)
+#### 2. Querying the View
 
-from datasharing.datasharing import DataSharingClient
+    ```python
+    # Example: Querying the view to count the records
+    query = "SELECT COUNT(*) FROM your_view_name;"
+    result_df = client.query_view(query)
+    print(result_df)
 
-# Initialize the client using credentials from .env file
-client = DataSharingClient()
+    # Example: Creating a new table from a query
+    query = "SELECT * FROM your_view_name WHERE your_column > some_value;"
+    new_table_name = "new_table_name"
+    client.query_view(query, new_table_name)
+    ```
 
-# OR
+#### 3. Listing All Tables
 
-# Initialize the client with direct input credentials
-# username = "Henrydata"
-# password = "Henrydata123!"
-# client = DataSharingClient(username=username, password=password)
+    ```python
+    # Example: Listing all tables and views
+    tables = client.list_tables()
+    print(tables)
+    ```
 
-# Example usage
+#### 4. Exporting Tables
 
-# 1. Creating a View
-s3_uri = "s3://crossbowbuckettest/public/francetax.parquet"
-view_name = "francetax"
-client.create_view(s3_uri, view_name)
+    ```python
+    # Example: Exporting tables to CSV
+    table_names = ["your_view_name", "new_table_name"]
+    output_dir = "/path/to/output"
 
-# 2. Querying the View
-query = "SELECT COUNT(*) FROM francetax;"
-result_df = client.query_view(query)
-print(result_df)
+    # Export to CSV
+    client.export_tables(table_names, output_dir, "csv")
 
-# Creating a new table from a query
-query = "SELECT * FROM francetax WHERE tax_rate > 20.0;"
-new_table_name = "high_tax_rates"
-client.query_view(query, new_table_name)
+    # Export to Parquet
+    client.export_tables(table_names, output_dir, "parquet")
+    ```
 
-# 3. Listing All Tables
-tables = client.list_tables()
-print(tables)
-
-# 4. Exporting Tables
-table_names = ["francetax", "high_tax_rates"]
-output_dir = "/path/to/output"
-
-# Export to CSV
-client.export_tables(table_names, output_dir, "csv")
-
-# Export to Parquet
-client.export_tables(table_names, output_dir, "parquet")
