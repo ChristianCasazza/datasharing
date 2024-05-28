@@ -1,0 +1,7 @@
+boto3
+duckdb
+requests
+python-dotenv
+jupyter
+pandas
+numpy
