@@ -125,7 +125,7 @@ This repository contains the `DataSharingClient` class, which allows you to inte
 
 ## Querying the View
 
-3. **Querying the View to Count the Records:**
+1. **Querying the View to Count the Records:**
     ```python
     # Example: Querying the view to count the records
     query = "SELECT COUNT(*) FROM your_view_name;"
@@ -133,7 +133,7 @@ This repository contains the `DataSharingClient` class, which allows you to inte
     print(result_df)
     ```
 
-4. **Creating a New Table from a Query:**
+2. **Creating a New Table from a Query:**
     ```python
     # Example: Creating a new table from a query
     query = "SELECT * FROM your_view_name WHERE your_column > some_value;"
@@ -141,7 +141,7 @@ This repository contains the `DataSharingClient` class, which allows you to inte
     client.query(query, new_table_name)
     ```
 
-5. **Listing All Tables**
+## Listing All Tables
 
 ```python
 # Example: Listing all tables and views
