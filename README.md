@@ -75,48 +75,39 @@ This repository contains the `DataSharingClient` class, which allows you to inte
 2. **Open the `.env` file** and input your credentials:
 
     ```
-    USERNAME=your_username
-    PASSWORD=your_password
+    OCEAN_USERNAME=your_username
+    OCEAN_PASSWORD=your_password
     ```
 
-### Example Usage
+# Example Usage
 
-#### Setting Up the Environment
+## Setting Up the Environment
 
 1. **Run the first code block to set all imports and initialize the client:**
 
     ```python
-    # Import necessary libraries and set up the environment
-    import os
-    import sys
-    from dotenv import load_dotenv
-
-    # Load environment variables from the .env file
-    load_dotenv()
-
-    # Add the project root to sys.path
-    notebook_dir = os.path.dirname(os.path.abspath('data.ipynb'))
-    project_root = os.path.abspath(os.path.join(notebook_dir, '..'))
-    if project_root not in sys.path:
-        sys.path.append(project_root)
-
-    from datasharing.datasharing import DataSharingClient
-
     # Initialize the client using credentials from .env file
     client = DataSharingClient()
-
-    # OR
-
-    # Initialize the client with direct input credentials
-    # username = "your_username"
-    # password = "your_password"
-    # client = DataSharingClient(username=username, password=password)
     ```
 
 2. **For VSCode users:** You can work directly in the `.ipynb` file without running the command line by selecting your virtual environment after clicking **Select Kernel** in the top right corner.
 
-#### 1. Creating a View
+## Initialization with Different Config Options
 
+1. **Default Initialization:**
+    ```python
+    client = DataSharingClient()
+    ```
+
+2. **Custom Initialization with DuckDB Parameters:**
+    ```python
+    duckdb_path = "path/to/file/nameofyourduckdbfile.duckdb"
+    client = DataSharingClient(duckdb_region="us-east-1", duckdb_path=duckdb_path)
+    ```
+
+## Creating a View
+
+1. **Creating a View from S3 URI:**
     ```python
     # Example: Creating a view from a Parquet file in S3
     s3_uri = "s3://your-bucket-name/path/to/yourfile.parquet"
@@ -124,39 +115,35 @@ This repository contains the `DataSharingClient` class, which allows you to inte
     client.create_view(s3_uri, view_name)
     ```
 
-#### 2. Querying the View
+2. **Creating a View from Local Path:**
+    ```python
+    # Example: Creating a view from a Parquet file in local storage
+    local_path = "path/to/local/file/yourfile.parquet"
+    view_name = "your_view_name"
+    client.create_view(local_path, view_name)
+    ```
 
+## Querying the View
+
+3. **Querying the View to Count the Records:**
     ```python
     # Example: Querying the view to count the records
     query = "SELECT COUNT(*) FROM your_view_name;"
-    result_df = client.query_view(query)
+    result_df = client.query(query)
     print(result_df)
+    ```
 
+4. **Creating a New Table from a Query:**
+    ```python
     # Example: Creating a new table from a query
     query = "SELECT * FROM your_view_name WHERE your_column > some_value;"
     new_table_name = "new_table_name"
-    client.query_view(query, new_table_name)
+    client.query(query, new_table_name)
     ```
 
-#### 3. Listing All Tables
+5. **Listing All Tables**
 
-    ```python
-    # Example: Listing all tables and views
-    tables = client.list_tables()
-    print(tables)
-    ```
-
-#### 4. Exporting Tables
-
-    ```python
-    # Example: Exporting tables to CSV
-    table_names = ["your_view_name", "new_table_name"]
-    output_dir = "/path/to/output"
-
-    # Export to CSV
-    client.export_tables(table_names, output_dir, "csv")
-
-    # Export to Parquet
-    client.export_tables(table_names, output_dir, "parquet")
-    ```
-
+```python
+# Example: Listing all tables and views
+tables = client.list_tables()
+print(tables)
