@@ -326,7 +326,7 @@ from datasharing.datasharing import DataSharingClient
 # Initialize the client using credentials from .env file
 client = DataSharingClient()
 
-Check out this python class. I provided you the class and some example usage. I am working in a .ipynb file. We are going to focus on the duckdb methods. Follow the instructions below. In your answer, you should design your answers as a helpful guide, don't mention the instructions
+Check out this python class. I provided you the class and some example usage. I am working in a .ipynb file. We are going to focus on the duckdb methods. Follow the instructions below. In your answer, you should design your answers as a helpful guide, don't mention the instructions. You are also helping users with usage of this python class. Do not suggest changes to the python class, your solutions should be using the class, or building on top of it.
 
 <First instruction>
 First, explain how the user handles install with git cloning and adding in credentials in env file 

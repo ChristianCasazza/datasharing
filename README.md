@@ -2,6 +2,10 @@
 
 This repository contains the `DataSharingClient` class, which allows you to interact with data stored in S3 and perform queries using DuckDB. This guide will help you set up your environment, configure your credentials, and use the various functionalities provided by the `DataSharingClient`.
 
+## LLM Partner
+
+LLMs can be a helpful partner when working with this repository. You can copy the contents `LLMPartner.txt` and add it into a chat assistant such as ChatGPT, Claude, Gemini, or any other provider you prefer. Your LLM partner can help out with syntax for SQL queries, provide guidance on using DuckDB within the DataSharingClient, and answer general questions about the code and your analysis. 
+
 ## Setup Instructions
 
 ### Prerequisites
