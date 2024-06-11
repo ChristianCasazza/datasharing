@@ -7,15 +7,15 @@ from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from dotenv import load_dotenv
 
 class DataSharingClient:
-    def __init__(self, duckdb_region=None, username=None, password=None, debug=False):
+    def __init__(self, duckdb_region=None, username=None, password=None, debug=False, duckdb_path=None):
         self.debug = debug  # Set the debug flag
 
         # Load environment variables from the .env file
         load_dotenv()
 
         # Retrieve credentials from environment variables if not provided
-        self.username = username or os.getenv("USERNAME")
-        self.password = password or os.getenv("PASSWORD")
+        self.username = username or os.getenv("OCEAN_USERNAME")
+        self.password = password or os.getenv("OCEAN_PASSWORD")
 
         if not self.username or not self.password:
             raise ValueError("Username and password must be provided either as arguments or in the .env file")
@@ -35,6 +35,7 @@ class DataSharingClient:
         self.conn = None
         self.s3_client = None
         self.cognito_identity_client = None
+        self.duckdb_path = duckdb_path  # Path for persistent DuckDB database
 
         self.authenticate_user()
         self.obtain_temporary_credentials()
@@ -154,7 +155,13 @@ class DataSharingClient:
         )
 
     def setup_duckdb(self):
-        self.conn = duckdb.connect(database=':memory:', read_only=False)
+        if self.duckdb_path:
+            # Use an existing DuckDB file or create a new one at the specified path
+            self.conn = duckdb.connect(database=self.duckdb_path, read_only=False)
+        else:
+            # Use an in-memory DuckDB instance
+            self.conn = duckdb.connect(database=':memory:', read_only=False)
+
         self.conn.execute("INSTALL httpfs;")
         self.conn.execute("LOAD httpfs;")
         self.conn.execute(f"SET s3_region='{self.config['duckdb_region']}';")
@@ -199,7 +206,7 @@ class DataSharingClient:
 
         self.conn.execute(query)
 
-    def query_view(self, query, new_table_name=None):
+    def query(self, query, new_table_name=None):
         if new_table_name:
             self.conn.execute(f"CREATE TABLE {new_table_name} AS {query}")
             print(f"Table {new_table_name} created from query.")
@@ -235,50 +242,3 @@ class DataSharingClient:
                     )
         else:
             raise ValueError(f"Unsupported file format: {file_format}")
-
-    def upload_to_s3(self, local_file_path, s3_uri):
-        try:
-            # Extract bucket name and key from s3_uri
-            s3_components = s3_uri.replace("s3://", "").split('/', 1)
-            bucket_name = s3_components[0]
-            s3_key = s3_components[1]
-
-            # Use the S3 client for the specified DuckDB region
-            s3_client = boto3.client(
-                's3',
-                aws_access_key_id=self.temporary_credentials['AccessKeyId'],
-                aws_secret_access_key=self.temporary_credentials['SecretKey'],
-                aws_session_token=self.temporary_credentials['SessionToken'],
-                region_name=self.config["duckdb_region"]
-            )
-
-            # Upload the file
-            s3_client.upload_file(local_file_path, bucket_name, s3_key)
-            print(f"File uploaded to S3 at {s3_uri}")
-        except Exception as e:
-            print(f"Error uploading file to S3: {e}")
-
-    def refresh_tokens(self):
-        auth_url = f"https://cognito-idp.{self.config['region']}.amazonaws.com/"
-        headers = {
-            "Content-Type": "application/x-amz-json-1.1",
-            "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth"
-        }
-        auth_data = {
-            "AuthParameters": {
-                "REFRESH_TOKEN": self.refresh_token
-            },
-            "AuthFlow": "REFRESH_TOKEN_AUTH",
-            "ClientId": self.config["clientId"]
-        }
-
-        response = requests.post(auth_url, headers=headers, json=auth_data)
-        response_data = response.json()
-
-        if response.status_code == 200:
-            self.id_token = response_data["AuthenticationResult"]["IdToken"]
-            self.access_token = response_data["AuthenticationResult"]["AccessToken"]
-            if self.debug:
-                print("Tokens refreshed successfully.")
-        else:
-            print("Token refresh failed:", response_data)
