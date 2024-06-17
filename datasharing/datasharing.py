@@ -5,6 +5,7 @@ import duckdb
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from dotenv import load_dotenv
+import urllib.parse
 
 class DataSharingClient:
     def __init__(self, duckdb_region=None, username=None, password=None, debug=False, duckdb_path=None):
@@ -242,3 +243,14 @@ class DataSharingClient:
                     )
         else:
             raise ValueError(f"Unsupported file format: {file_format}")
+
+    def download_dataset(self, s3_uri, local_path):
+        parsed_url = urllib.parse.urlparse(s3_uri)
+        bucket_name = parsed_url.netloc
+        object_key = parsed_url.path.lstrip('/')
+
+        try:
+            self.s3_client.download_file(bucket_name, object_key, local_path)
+            print(f"Downloaded {s3_uri} to {local_path}")
+        except Exception as e:
+            print(f"Error downloading dataset: {e}")
