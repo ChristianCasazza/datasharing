@@ -5,3 +5,5 @@ python-dotenv
 jupyter
 pandas
 numpy
+ibis-framework[duckdb]
+s3fs

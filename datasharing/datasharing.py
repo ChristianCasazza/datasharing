@@ -1,10 +1,12 @@
 import os
 import requests
 import json
-import duckdb
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from dotenv import load_dotenv
+import ibis
+import s3fs
+import pandas as pd
 import urllib.parse
 
 class DataSharingClient:
@@ -40,7 +42,7 @@ class DataSharingClient:
 
         self.authenticate_user()
         self.obtain_temporary_credentials()
-        self.setup_duckdb()
+        self.setup_ibis_duckdb()
 
         if not self.debug:
             print("It's data time!")
@@ -155,22 +157,31 @@ class DataSharingClient:
             region_name=self.config["duckdb_region"]
         )
 
-    def setup_duckdb(self):
+    def setup_ibis_duckdb(self):
+        # Use DuckDB as the Ibis backend
         if self.duckdb_path:
             # Use an existing DuckDB file or create a new one at the specified path
-            self.conn = duckdb.connect(database=self.duckdb_path, read_only=False)
+            self.ibis_conn = ibis.connect(f'duckdb://{self.duckdb_path}')
         else:
             # Use an in-memory DuckDB instance
-            self.conn = duckdb.connect(database=':memory:', read_only=False)
+            self.ibis_conn = ibis.connect('duckdb://:memory:')
 
-        self.conn.execute("INSTALL httpfs;")
-        self.conn.execute("LOAD httpfs;")
-        self.conn.execute(f"SET s3_region='{self.config['duckdb_region']}';")
-        self.conn.execute(f"SET s3_access_key_id='{self.temporary_credentials['AccessKeyId']}';")
-        self.conn.execute(f"SET s3_secret_access_key='{self.temporary_credentials['SecretKey']}';")
-        self.conn.execute(f"SET s3_session_token='{self.temporary_credentials['SessionToken']}';")
+        fs = s3fs.S3FileSystem(
+            key=self.temporary_credentials['AccessKeyId'],
+            secret=self.temporary_credentials['SecretKey'],
+            token=self.temporary_credentials['SessionToken'],
+            client_kwargs={'region_name': self.config['duckdb_region']}
+        )
+
+        self.ibis_conn.raw_sql("INSTALL httpfs;")
+        self.ibis_conn.raw_sql("LOAD httpfs;")
+        self.ibis_conn.raw_sql(f"SET s3_access_key_id='{self.temporary_credentials['AccessKeyId']}';")
+        self.ibis_conn.raw_sql(f"SET s3_secret_access_key='{self.temporary_credentials['SecretKey']}';")
+        self.ibis_conn.raw_sql(f"SET s3_session_token='{self.temporary_credentials['SessionToken']}';")
+        self.ibis_conn.raw_sql(f"SET s3_region='{self.config['duckdb_region']}';")
+        self.ibis_conn.register_filesystem(fs)
         if self.debug:
-            print("DuckDB setup complete.")
+            print("DuckDB setup complete with Ibis and S3FS.")
 
     def create_view(self, path, view_name):
         if path.startswith("s3://"):
@@ -191,7 +202,7 @@ class DataSharingClient:
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
 
-        self.conn.execute(query)
+        self.ibis_conn.raw_sql(query)
 
     def _create_view_from_local(self, file_path, view_name):
         file_extension = file_path.split('.')[-1].lower()
@@ -205,44 +216,53 @@ class DataSharingClient:
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
 
-        self.conn.execute(query)
+        self.ibis_conn.raw_sql(query)
 
     def query(self, query, new_table_name=None):
-        if new_table_name:
-            self.conn.execute(f"CREATE TABLE {new_table_name} AS {query}")
-            print(f"Table {new_table_name} created from query.")
+        if isinstance(query, str):
+            if new_table_name:
+                # Create a new table from the query
+                create_table_query = f"CREATE TABLE {new_table_name} AS {query}"
+                self.ibis_conn.raw_sql(create_table_query)
+            else:
+                return self.ibis_conn.raw_sql(query).df()
+        elif isinstance(query, ibis.expr.types.Table):
+            if new_table_name:
+                # Create a new table from the Ibis table expression
+                create_table_query = f"CREATE TABLE {new_table_name} AS {query.compile()}"
+                self.ibis_conn.raw_sql(create_table_query)
+            else:
+                return query.execute()
         else:
-            result_df = self.conn.execute(query).fetchdf()
-            print(f"Query: {query}")
-            return result_df
+            raise TypeError("Query must be a string or an Ibis table expression.")
 
-    def list_tables(self):
-        query = """
-        SELECT table_name, table_type 
-        FROM information_schema.tables 
-        WHERE table_schema='main'
-        """
-        tables = self.conn.execute(query).fetchall()
-        return tables
+    def export_tables(self, table_names, output_dir, file_format='csv'):
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
-    def export_tables(self, table_names, output_dir, file_format):
-        os.makedirs(output_dir, exist_ok=True)
+        for table_name in table_names:
+            if isinstance(table_name, ibis.expr.types.Table):
+                # If the table name is an Ibis table expression
+                table_expr = table_name
+            elif isinstance(table_name, ibis.expr.types.Column):
+                # If the table name is a column expression, convert it to a table
+                table_expr = table_name.to_projection()
+            elif isinstance(table_name, str):
+                # If the table name is a string, get the table from DuckDB
+                table_expr = self.ibis_conn.table(table_name)
+            else:
+                raise TypeError("Table name must be either a string, an Ibis table expression, or an Ibis column expression.")
+            
+            output_path = os.path.join(output_dir, f"{table_expr.op().name}.{file_format}")
 
-        if file_format in ["parquet", "csv"]:
-            for table_name in table_names:
-                file_name = f"{table_name}.{file_format}"
-                file_path = os.path.join(output_dir, file_name)
+            if file_format == 'csv':
+                self.ibis_conn.raw_sql(f"COPY ({table_expr.compile()}) TO '{output_path}' WITH (FORMAT CSV, HEADER TRUE);")
+            elif file_format == 'parquet':
+                self.ibis_conn.raw_sql(f"COPY ({table_expr.compile()}) TO '{output_path}' WITH (FORMAT PARQUET);")
+            else:
+                raise ValueError(f"Unsupported file format: {file_format}")
 
-                if file_format == "parquet":
-                    self.conn.execute(
-                        f"COPY (SELECT * FROM {table_name}) TO '{file_path}' (FORMAT 'parquet')"
-                    )
-                elif file_format == "csv":
-                    self.conn.execute(
-                        f"COPY (SELECT * FROM {table_name}) TO '{file_path}' (HEADER, DELIMITER ',')"
-                    )
-        else:
-            raise ValueError(f"Unsupported file format: {file_format}")
+        print(f"Tables exported to {output_dir}.")
 
     def download_dataset(self, s3_uri, local_path):
         parsed_url = urllib.parse.urlparse(s3_uri)
@@ -254,3 +274,4 @@ class DataSharingClient:
             print(f"Downloaded {s3_uri} to {local_path}")
         except Exception as e:
             print(f"Error downloading dataset: {e}")
+
