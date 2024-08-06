@@ -23,7 +23,7 @@ class DataSharingClient:
 
         self.config = {
             "region": "us-east-1",  # Default region for Cognito
-            "duckdb_region": duckdb_region or "eu-west-3",  # Default to eu-west-3 if not specified
+            "duckdb_region": duckdb_region or "us-east-1",  # Default to us-east-1 if not specified
             "userPoolId": "us-east-1_EgvUvAJoP",
             "clientId": "6elhn5n4tt1p4dfa41ulljmbp3",
             "identityPoolId": "us-east-1:60dd28e7-c15f-4108-b2a1-a672c12c9756",
