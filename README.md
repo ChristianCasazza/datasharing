@@ -27,13 +27,13 @@ LLMs can be a helpful partner when working with this repository. You can copy th
 2. **Create a virtual environment** with a custom name (e.g., `myenv`):
 
     ```bash
-    python -m venv myenv
+    python3 -m venv newvenv
     ```
 
 3. **Activate the virtual environment**:
 
     ```bash
-    myenv\Scripts\activate
+    source newvenv/bin/activate
     ```
 
 4. **Install the required dependencies**:
