@@ -207,13 +207,13 @@ class DataSharingClient:
 
         self.conn.execute(query)
 
-    def query(self, query, new_table_name=None):
+    def query(self, query, new_table_name=None, print_query=True):
         if new_table_name:
             self.conn.execute(f"CREATE TABLE {new_table_name} AS {query}")
             print(f"Table {new_table_name} created from query.")
         else:
             result_df = self.conn.execute(query).fetchdf()
-            print(f"Query: {query}")
+            if print_query: print(f"Query: {query}")
             return result_df
 
     def list_tables(self):
